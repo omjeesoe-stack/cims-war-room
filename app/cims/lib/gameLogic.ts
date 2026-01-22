@@ -127,7 +127,38 @@ export function getStrategicAnalysis(state: GameState): StrategicAnalysis {
 }
 
 // Supabase helper
+// Supabase helper
 export const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://adkrfizzwqekogiiruzf.supabase.co',
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFka3JmaXp6d3Fla29naWlydXpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkwMDkxMDYsImV4cCI6MjA4NDU4NTEwNn0.xs9qs9HUCd-y5IGZIJrH_yIlW0XyLJV4DTcRTgLAg3I'
 );
+
+export async function submitSimulation(state: GameState, analysis: StrategicAnalysis) {
+    try {
+        const payload = {
+            student_name: state.studentName,
+            enrollment_number: state.enrollmentNumber,
+            choices: state.choices,
+            grade: analysis.grade,
+            score: analysis.score,
+            pnl: analysis.pnl,
+            warnings: analysis.warnings,
+            errors: analysis.errors,
+            submitted_at: new Date().toISOString()
+        };
+
+        const { data, error } = await supabase
+            .from('cims_submissions')
+            .insert([payload]);
+
+        if (error) {
+            console.error("Supabase Submission Error:", error);
+            return { success: false, error };
+        }
+        console.log("Supabase Submission Success:", data);
+        return { success: true, data };
+    } catch (err) {
+        console.error("Unexpected Submission Error:", err);
+        return { success: false, error: err };
+    }
+}

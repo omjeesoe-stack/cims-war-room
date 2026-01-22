@@ -485,14 +485,33 @@ export function MediaStage({ state, onUpdate, onNext }: StageProps) {
 // ----------------------------------------------------------------------
 // STAGE 7: STRATEGIC AUDIT REPORT (UPDATED)
 // ----------------------------------------------------------------------
+import { submitSimulation } from '../lib/gameLogic';
+
 export function AARStage({ state }: { state: GameState }) {
     const { grade, pnl, warnings, errors, score } = getStrategicAnalysis(state);
+    const [submitStatus, setSubmitStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+
+    React.useEffect(() => {
+        const doSubmit = async () => {
+            if (submitStatus !== 'idle') return;
+            setSubmitStatus('submitting');
+            const result = await submitSimulation(state, { grade, pnl, warnings, errors, score });
+            if (result.success) setSubmitStatus('success');
+            else setSubmitStatus('error');
+        };
+        doSubmit();
+    }, []);
 
     return (
         <div className="animate-fadeIn w-full">
             <div className="mb-8 text-center">
                 <h1 className="text-4xl font-black text-white mb-2">STRATEGIC AUDIT</h1>
                 <p className="text-slate-500 uppercase tracking-widest">Candidate: {state.studentName} ({state.enrollmentNumber})</p>
+                <div className="mt-2 h-6">
+                    {submitStatus === 'submitting' && <span className="text-xs text-yellow-500 animate-pulse">Saving to Cloud...</span>}
+                    {submitStatus === 'success' && <span className="text-xs text-emerald-500">✓ Result Archived Securely</span>}
+                    {submitStatus === 'error' && <span className="text-xs text-red-500">⚠ Cloud Save Failed (Check Console)</span>}
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
