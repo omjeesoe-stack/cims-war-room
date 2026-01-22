@@ -510,7 +510,11 @@ export function AARStage({ state }: { state: GameState }) {
                 <div className="mt-2 h-6">
                     {submitStatus === 'submitting' && <span className="text-xs text-yellow-500 animate-pulse">Saving to Cloud...</span>}
                     {submitStatus === 'success' && <span className="text-xs text-emerald-500">✓ Result Archived Securely</span>}
-                    {submitStatus === 'error' && <span className="text-xs text-red-500">⚠ Cloud Save Failed (Check Console)</span>}
+                    {submitStatus === 'error' && (
+                        <span className="text-xs text-red-500" title="Check console for full error">
+                            ⚠ Save Failed. Did you run the SQL script?
+                        </span>
+                    )}
                 </div>
             </div>
 
