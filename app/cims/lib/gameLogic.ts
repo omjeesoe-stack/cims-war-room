@@ -66,62 +66,88 @@ export function getStrategicAnalysis(state: GameState): StrategicAnalysis {
     const warnings: string[] = [];
     const errors: string[] = [];
 
-    // --- LOGIC RULES ---
+    const { choices } = state;
+    const minAge = choices.ageRange[0];
+    const maxAge = choices.ageRange[1];
 
-    // 1. TEENAGERS & LINKEDIN
-    // Since we don't have LinkedIn in the code yet (implied 'Media Allocation' might need a generic "Professional" channel or just generalize the logic)
-    // For now, let's assume 'WhatsApp Business' behaves like a 'Professional/Direct' channel which teens might ignore, 
-    // OR we add LinkedIn if needed. The prompt mentioned "Channel == LinkedIn".
-    // Note: The prompt explicitly asked for "Reels, Shorts, WhatsApp" in Stage 6 in the ORIGINAL prompt.
-    // The NEW prompt uses "Channel == LinkedIn" as an EXAMPLE. I will treat 'WhatsApp' as the 'Direct/Professional' proxy 
-    // or I can add a dummy 'LinkedIn' if I were redesigning, but for now let's stick to the existing channels 
-    // and apply logic to "WhatsApp" if relevant, OR 
-    // ACTUALLY, I will add logic that IF they picked > 50% WhatsApp for anyone < 20, it's a fail.
-    if (state.choices.ageRange[1] < 20 && state.choices.mediaAllocation.whatsapp > 50) {
-        errors.push("Strategic Fail: Teenagers (15-19) have low engagement with WhatsApp Business API messages compared to social feeds.");
+    // --- 1. CRITICAL FAILURES (Errors) ---
+    // Teenagers & Business Messaging (WhatsApp logic)
+    if (maxAge < 20 && choices.mediaAllocation.whatsapp > 50) {
+        errors.push("Strategic Fail: Teenagers (15-19) have low engagement with WhatsApp Business API messages.");
         score -= 25;
     }
 
-    // 2. CULTURAL FRICTION (Modernist vs Tradition)
-    if (state.choices.cityTier === 3 && state.choices.culturalFit === 'Modernist') {
-        warnings.push("Cultural Friction: You projected Modernist values on a Traditionalist rural segment.");
-        score -= 15;
-    }
-
-    // 3. INCOME & TIER MISMATCH
-    if (state.choices.incomeLevel > 20 && state.choices.cityTier === 3) {
-        warnings.push("Market Reality: High Net Worth density is extremely low in Tier 3 cities.");
-        score -= 10;
-    }
-
-    // 4. AGE & PLATFORM
-    // Seniors (50+) and Reels/Shorts
-    if (state.choices.ageRange[0] > 50 && (state.choices.mediaAllocation.reels + state.choices.mediaAllocation.shorts > 70)) {
-        warnings.push("Platform mismatch: >50 demographics have lower adoption of short-form vertical video.");
-        score -= 10;
-    }
-
-    // 5. MEDIA ALLOCATION TOTAL
-    const totalAllocation = state.choices.mediaAllocation.reels + state.choices.mediaAllocation.shorts + state.choices.mediaAllocation.whatsapp;
+    // Math Fail
+    const totalAllocation = choices.mediaAllocation.reels + choices.mediaAllocation.shorts + choices.mediaAllocation.whatsapp;
     if (totalAllocation > 100) {
         errors.push("Math Fail: Media allocation exceeds 100%.");
         score -= 50;
-    } else if (totalAllocation < 80) {
-        warnings.push("Inefficiency: Underutilized media budget.");
+    }
+
+    // --- 2. LOGIC TRAPS (Warnings & Penalties) ---
+
+    // The "Status" Trap: Low Income cannot prioritize Status over Utility
+    // Income Levels: 0-10 (Low), 10-20 (Mid), 20-50 (High), 50+ (Ultra) -> Logic uses number
+    if (choices.incomeLevel < 10 && choices.motivation === 'Status') {
+        warnings.push("Strategy Error: Low income segments prioritize 'Utility' or 'Value' over 'Status'.");
+        score -= 15;
+    }
+
+    // The "Trend" Mismatch: Seniors don't chase fast trends
+    if (minAge > 50 && choices.motivation === 'Trend') {
+        warnings.push("Demographic Mismatch: Seniors (>50) rarely prioritize 'Trend'. They prefer 'Health' or 'Utility'.");
+        score -= 10;
+    }
+
+    // Psychographic Clash: Adventurous vs Traditionalist
+    if (choices.personality === 'Adventurous' && choices.culturalFit === 'Traditionalist') {
+        warnings.push("Psychographic Clash: 'Adventurous' personality conflicts with 'Traditionalist' cultural values.");
+        score -= 10;
+    }
+
+    // Cultural Friction: Modernist values in Deep Rural (Tier 3)
+    if (choices.cityTier === 3 && choices.culturalFit === 'Modernist') {
+        warnings.push("Cultural Friction: Projecting Modernist values on a traditional rural (Tier 3) segment.");
+        score -= 15;
+    }
+
+    // City/Family Reality: Tier 1 Metros are predominantly Nuclear
+    if (choices.cityTier === 1 && choices.familyStructure === 'Joint') {
+        warnings.push("Market Reality: Tier 1 Metros have a 70%+ skew towards 'Nuclear' families.");
         score -= 5;
     }
 
+    // Budget Efficiency: Leaving money on the table
+    if (totalAllocation < 95) {
+        warnings.push(`Inefficiency: ${100 - totalAllocation}% of your budget is unallocated.`);
+        score -= 5;
+    }
 
-    // CALC P&L
+    // Platform Mismatch: Seniors on Reels/Shorts
+    if (minAge > 50 && (choices.mediaAllocation.reels + choices.mediaAllocation.shorts > 60)) {
+        warnings.push("Platform Mismatch: >50 demographics have lower adoption of short-form vertical video.");
+        score -= 10;
+    }
+
+    // --- 3. CALCULATE P&L ---
     const multiplier = Math.max(0, score) / 50;
     const pnl = (calculateBudget(state.insightsUnlocked) * multiplier) - calculateBudget(state.insightsUnlocked);
 
-    // GRADE
+    // --- 4. ASSIGN GRADE (Hard Mode) ---
+    // A+: 97-100, A: 93-96, A-: 90-92
+    // B+: 87-89, B: 83-86, B-: 80-82
+    // C+: 77-79, C: 73-76, C-: 70-72
+    // F: <70
     let grade = 'F';
-    if (score >= 90) grade = 'A';
-    else if (score >= 80) grade = 'B';
-    else if (score >= 70) grade = 'C';
-    else if (score >= 60) grade = 'D';
+    if (score >= 97) grade = 'A+';
+    else if (score >= 93) grade = 'A';
+    else if (score >= 90) grade = 'A-';
+    else if (score >= 87) grade = 'B+';
+    else if (score >= 83) grade = 'B';
+    else if (score >= 80) grade = 'B-';
+    else if (score >= 77) grade = 'C+';
+    else if (score >= 73) grade = 'C';
+    else if (score >= 70) grade = 'C-';
 
     return { grade, pnl, warnings, errors, score };
 }
